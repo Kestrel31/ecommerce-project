@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TechShop</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,sans-serif;background:#f5f5f7;color:#1d1d1f}
+  header{background:#111;color:#fff;padding:14px 24px;font-size:20px;font-weight:600}
+  #ad{background:#fff3cd;text-align:center;padding:8px;font-size:14px}
+  #ad:empty{display:none}
+  main{display:grid;grid-template-columns:1fr 340px;gap:24px;padding:24px;max-width:1200px;margin:auto}
+  #products{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px}
+  .card{background:#fff;border-radius:12px;padding:16px;text-align:center;box-shadow:0 1px 3px #0001}
+  .emoji{font-size:56px}
+  .card h3{margin:8px 0 4px;font-size:16px}
+  .card p{margin:0 0 8px;font-size:13px;color:#666}
+  button{background:#0071e3;color:#fff;border:0;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:14px}
+  button.sec{background:#e5e5ea;color:#111}
+  aside{background:#fff;border-radius:12px;padding:16px;height:fit-content;box-shadow:0 1px 3px #0001}
+  .row{display:flex;justify-content:space-between;margin:6px 0;font-size:14px}
+  input{width:100%;padding:8px;margin:8px 0;border:1px solid #ccc;border-radius:8px}
+  #msg{margin-top:10px;font-size:14px}
+  .err{color:#c00}.ok{color:#0a7d2c}
+  @media(max-width:800px){main{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>🛒 TechShop</header>
+<div id="ad"></div>
+<main>
+  <section id="products"></section>
+  <aside>
+    <h2 style="margin-top:0">Cart</h2>
+    <div id="cart">Loading…</div>
+    <input id="card" placeholder="Card number (ending 0000 = declined)" value="4242 4242 4242 4242">
+    <button id="checkout">Checkout</button>
+    <button class="sec" id="clear">Clear</button>
+    <div id="msg"></div>
+  </aside>
+</main>
+<script>
+const sid = localStorage.sid || (localStorage.sid = crypto.randomUUID());
+const $ = (id) => document.getElementById(id);
+const money = (c) => '$' + (c / 100).toFixed(2);
+const msg = (t, ok) => { $('msg').textContent = t; $('msg').className = ok ? 'ok' : 'err'; };
+
+async function api(path, opts = {}) {
+  const r = await fetch('/api' + path, {
+    ...opts, headers: { 'content-type': 'application/json' },
+    body: opts.body && JSON.stringify(opts.body),
+  });
+  const data = await r.json().catch(() => null);
+  if (!r.ok) throw new Error(data?.error || r.statusText);
+  return data;
+}
+
+async function loadProducts() {
+  const ps = await api('/products');
+  $('products').innerHTML = ps.map((p) => `
+    <div class="card"><div class="emoji">${p.emoji}</div><h3>${p.name}</h3>
+    <p>${p.description}</p><strong>${money(p.price_cents)}</strong><br><br>
+    <button onclick="add(${p.id})">Add to cart</button></div>`).join('');
+}
+
+async function loadAd() {
+  try { const ad = await api('/ads'); $('ad').textContent = ad ? ad.text : ''; } catch { $('ad').textContent = ''; }
+}
+
+function renderCart(items) {
+  if (!items.length) { $('cart').textContent = 'Your cart is empty.'; return; }
+  const total = items.reduce((s, i) => s + i.price_cents * i.qty, 0);
+  $('cart').innerHTML = items.map((i) =>
+    `<div class="row"><span>${i.name} × ${i.qty}</span><span>${money(i.price_cents * i.qty)}</span></div>`).join('') +
+    `<hr><div class="row"><strong>Total</strong><strong>${money(total)}</strong></div>`;
+}
+
+async function loadCart() {
+  try { renderCart(await api('/cart/' + sid)); } catch (e) { $('cart').innerHTML = `<span class="err">Cart unavailable</span>`; }
+}
+
+async function add(id) {
+  try { renderCart(await api('/cart/' + sid, { method: 'POST', body: { productId: id } })); msg(''); }
+  catch (e) { msg(e.message); }
+}
+
+$('clear').onclick = async () => { try { renderCart(await api('/cart/' + sid, { method: 'DELETE' })); } catch (e) { msg(e.message); } };
+$('checkout').onclick = async () => {
+  try {
+    const r = await api('/checkout/' + sid, { method: 'POST', body: { card: $('card').value } });
+    msg(`Order #${r.orderId} placed — ${money(r.total_cents)}`, true); loadCart();
+  } catch (e) { msg(e.message); }
+};
+
+loadProducts(); loadCart(); loadAd(); setInterval(loadAd, 15000);
+</script>
+</body>
+</html>

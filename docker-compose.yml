@@ -1,0 +1,45 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: shop
+      POSTGRES_PASSWORD: shop
+      POSTGRES_DB: shop
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shop"]
+      interval: 3s
+      retries: 20
+
+  cart:
+    build: ./services/cart
+    ports: ["3001:3001"]
+  payment:
+    build: ./services/payment
+    ports: ["3002:3002"]
+  ads:
+    build: ./services/ads
+    ports: ["3003:3003"]
+
+  api:
+    build: ./services/api
+    environment:
+      DATABASE_URL: postgres://shop:shop@db:5432/shop
+      CART_URL: http://cart:3001
+      PAYMENT_URL: http://payment:3002
+      ADS_URL: http://ads:3003
+    depends_on:
+      db: { condition: service_healthy }
+    ports: ["3000:3000"]
+
+  frontend:
+    build: ./services/frontend
+    environment:
+      API_URL: http://api:3000
+    depends_on: [api]
+    ports: ["8080:8080"]
+
+volumes:
+  pgdata:
