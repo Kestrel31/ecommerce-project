@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - data/postgres.yaml
+  - cart/cart.yaml
+  - payment/payment.yaml
+  - ads/ads.yaml
+  - web/api.yaml
+  - web/frontend.yaml
+  - netpol.yaml
+configMapGenerator:
+  - name: db-init
+    namespace: data
+    files:
+      - init.sql=data/init.sql
+generatorOptions:
+  disableNameSuffixHash: true

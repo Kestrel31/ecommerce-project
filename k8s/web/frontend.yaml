@@ -1,0 +1,42 @@
+# NodePort for now; Phase 4 puts cloudflared in front.
+apiVersion: v1
+kind: Service
+metadata: { name: frontend, namespace: web }
+spec:
+  type: NodePort
+  selector: { app: frontend }
+  ports: [{ port: 8080, nodePort: 30080 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: frontend, namespace: web }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: frontend }
+  template:
+    metadata:
+      labels: { app: frontend }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: frontend
+          image: shop/frontend:dev
+          ports: [{ containerPort: 8080 }]
+          env:
+            - { name: API_URL, value: "http://api:3000" }
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            initialDelaySeconds: 10
+          resources:
+            requests: { cpu: 25m, memory: 48Mi }
+            limits: { memory: 128Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }

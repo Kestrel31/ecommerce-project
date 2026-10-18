@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Service
+metadata: { name: ads, namespace: ads }
+spec:
+  selector: { app: ads }
+  ports: [{ port: 3003 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: ads, namespace: ads }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: ads }
+  template:
+    metadata:
+      labels: { app: ads }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: ads
+          image: shop/ads:dev
+          ports: [{ containerPort: 3003 }]
+          readinessProbe:
+            httpGet: { path: /healthz, port: 3003 }
+          livenessProbe:
+            httpGet: { path: /healthz, port: 3003 }
+            initialDelaySeconds: 10
+          resources:
+            requests: { cpu: 25m, memory: 48Mi }
+            limits: { memory: 128Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
