@@ -151,6 +151,23 @@ Browser → frontend (proxies /api/*) → api → postgres / cart / payment / ad
 
 ---
 
+## Phase 3: Terraform
+
+### Q: Why move namespaces and secrets from `deploy.sh` into Terraform?
+**Answer:** They are infrastructure, not application releases. Terraform gives declarative state, drift detection and a single source of truth, and `deploy.sh` is left to do the app release. The DB password becomes a `random_password` resource, so both secrets derive from one value.
+
+**Trade-off to state:** the password now lives in Terraform state, so state must be gitignored and backed up. A remote, encrypted backend would be the production choice.
+
+### Q: Why wasn't Cloudflare in Phase 3?
+**Answer:** The tunnel and DNS only matter alongside the `cloudflared` deployment, so they were moved to Phase 4. That also avoids needing a domain and API token before they're useful.
+
+### Q: What happens when Terraform meets resources that already exist?
+**Answer:** Terraform only manages what is in its state. Existing namespaces and secrets cause "already exists" errors, so you `terraform import` them. For `random_password`, importing the existing value keeps Postgres working, because the volume already holds that password. Always read the plan before applying: a proposed namespace replacement would delete its contents.
+
+**Interview angle:** adopting existing infrastructure into IaC, state as a source of truth, and the danger of replace actions on stateful resources.
+
+---
+
 ## Design decisions to be ready to defend
 
 | Decision | Reasoning | Trade-off |
