@@ -41,7 +41,11 @@
   </aside>
 </main>
 <script>
-const sid = localStorage.sid || (localStorage.sid = crypto.randomUUID());
+// crypto.randomUUID() only exists in secure contexts (HTTPS/localhost), so fall back for plain-HTTP access
+const uuid = () => crypto.randomUUID ? crypto.randomUUID()
+  : ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, (c) =>
+      (c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16));
+const sid = localStorage.sid || (localStorage.sid = uuid());
 const $ = (id) => document.getElementById(id);
 const money = (c) => '$' + (c / 100).toFixed(2);
 const msg = (t, ok) => { $('msg').textContent = t; $('msg').className = ok ? 'ok' : 'err'; };
@@ -57,7 +61,10 @@ async function api(path, opts = {}) {
 }
 
 async function loadProducts() {
-  const ps = await api('/products');
+  let ps;
+  try { ps = await api('/products'); }
+  catch (e) { $('products').innerHTML = `<p class="err">Could not load products: ${e.message}</p>`; return; }
+  if (!ps.length) { $('products').innerHTML = '<p>No products available.</p>'; return; }
   $('products').innerHTML = ps.map((p) => `
     <div class="card"><div class="emoji">${p.emoji}</div><h3>${p.name}</h3>
     <p>${p.description}</p><strong>${money(p.price_cents)}</strong><br><br>
