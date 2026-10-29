@@ -65,9 +65,13 @@ resource "helm_release" "monitoring" {
       }
       # Dashboards are loaded from ConfigMaps labelled grafana_dashboard=1
       sidecar = { dashboards = { enabled = true, label = "grafana_dashboard", searchNamespace = "ALL" } }
+      # Grafana 13 auto-installs preinstalled plugins at startup, which spiked memory past the old 300Mi limit (OOMKilled).
+      "grafana.ini" = {
+        plugins = { preinstall_disabled = true }
+      }
       resources = {
-        requests = { cpu = "50m", memory = "128Mi" }
-        limits   = { memory = "300Mi" }
+        requests = { cpu = "50m", memory = "192Mi" }
+        limits   = { memory = "512Mi" }
       }
     }
 
