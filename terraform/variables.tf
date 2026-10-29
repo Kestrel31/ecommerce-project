@@ -7,7 +7,13 @@ variable "kubeconfig" {
 variable "namespaces" {
   description = "One namespace per tier / microservice"
   type        = set(string)
-  default     = ["web", "data", "cart", "payment", "ads", "cloudflare"]
+  default     = ["web", "data", "cart", "payment", "ads", "cloudflare", "monitoring"]
+}
+
+variable "kube_prometheus_stack_version" {
+  description = "Helm chart version. null = latest at apply time; pin it once it works."
+  type        = string
+  default     = null
 }
 
 variable "cloudflare_api_token" {

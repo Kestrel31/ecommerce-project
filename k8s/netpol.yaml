@@ -1,5 +1,4 @@
-# Backend namespaces accept ingress only from the `web` namespace.
-# (Phase 5: add a rule allowing the monitoring namespace to scrape /metrics.)
+# Backend namespaces accept ingress only from `web` (the app) and `monitoring` (Prometheus scrapes).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata: { name: allow-from-web, namespace: data }
@@ -13,7 +12,7 @@ spec:
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
-metadata: { name: allow-from-web, namespace: cart }
+metadata: { name: allow-from-web-and-monitoring, namespace: cart }
 spec:
   podSelector: {}
   policyTypes: [Ingress]
@@ -21,10 +20,12 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels: { kubernetes.io/metadata.name: web }
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: monitoring }
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
-metadata: { name: allow-from-web, namespace: payment }
+metadata: { name: allow-from-web-and-monitoring, namespace: payment }
 spec:
   podSelector: {}
   policyTypes: [Ingress]
@@ -32,10 +33,12 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels: { kubernetes.io/metadata.name: web }
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: monitoring }
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
-metadata: { name: allow-from-web, namespace: ads }
+metadata: { name: allow-from-web-and-monitoring, namespace: ads }
 spec:
   podSelector: {}
   policyTypes: [Ingress]
@@ -43,3 +46,5 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels: { kubernetes.io/metadata.name: web }
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: monitoring }

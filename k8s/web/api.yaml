@@ -23,7 +23,7 @@ spec:
       containers:
         - name: api
           image: shop/api:dev
-          ports: [{ containerPort: 3000 }]
+          ports: [{ name: http, containerPort: 3000 }]
           envFrom:
             - secretRef: { name: api-db }   # DATABASE_URL
           env:

@@ -23,7 +23,7 @@ spec:
       containers:
         - name: payment
           image: shop/payment:dev
-          ports: [{ containerPort: 3002 }]
+          ports: [{ name: http, containerPort: 3002 }]
           readinessProbe:
             httpGet: { path: /healthz, port: 3002 }
           livenessProbe:

@@ -1,0 +1,49 @@
+# Alerts are visible in Prometheus (Status → Alerts) and Grafana. Alertmanager is disabled to save RAM.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: shop-alerts
+  namespace: monitoring
+spec:
+  groups:
+    - name: shop
+      rules:
+        # Scaled-to-zero or crashed deployments have no scrape target, so `up` would just vanish.
+        # kube-state-metrics sees them, so alert on that.
+        - alert: ServiceUnavailable
+          expr: kube_deployment_status_replicas_available{namespace=~"web|cart|payment|ads"} == 0
+          for: 1m
+          labels: { severity: critical }
+          annotations:
+            summary: "{{ $labels.namespace }}/{{ $labels.deployment }} has no available replicas"
+
+        - alert: PostgresUnavailable
+          expr: kube_statefulset_status_replicas_ready{namespace="data",statefulset="postgres"} == 0
+          for: 1m
+          labels: { severity: critical }
+          annotations:
+            summary: "Postgres has no ready replicas"
+
+        - alert: ApiHighErrorRate
+          expr: |
+            sum(rate(http_request_duration_seconds_count{app="api",status=~"5.."}[5m]))
+              / sum(rate(http_request_duration_seconds_count{app="api"}[5m])) > 0.05
+          for: 5m
+          labels: { severity: warning }
+          annotations:
+            summary: "API 5xx rate above 5% for 5 minutes"
+
+        - alert: CheckoutFailures
+          expr: |
+            sum(increase(orders_total{result="failed"}[10m]))
+              / clamp_min(sum(increase(orders_total[10m])), 1) > 0.5
+          for: 5m
+          labels: { severity: warning }
+          annotations:
+            summary: "More than half of checkouts failed in the last 10 minutes"
+
+        - alert: PodRestarting
+          expr: increase(kube_pod_container_status_restarts_total{namespace=~"web|data|cart|payment|ads"}[15m]) > 2
+          labels: { severity: warning }
+          annotations:
+            summary: "{{ $labels.namespace }}/{{ $labels.pod }} restarted more than twice in 15 minutes"

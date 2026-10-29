@@ -6,6 +6,13 @@ terraform {
     random     = { source = "hashicorp/random", version = "~> 3.6" }
     null       = { source = "hashicorp/null", version = "~> 3.2" }
     cloudflare = { source = "cloudflare/cloudflare", version = "~> 4.40" }
+    helm       = { source = "hashicorp/helm", version = "~> 2.14" }
+  }
+}
+
+provider "helm" {
+  kubernetes {
+    config_path = var.kubeconfig
   }
 }
 

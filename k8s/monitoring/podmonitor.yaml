@@ -1,0 +1,17 @@
+# Scrape /metrics from every app pod. Container ports are named `http`.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: shop-apps
+  namespace: monitoring
+spec:
+  namespaceSelector:
+    matchNames: [web, cart, payment, ads]
+  selector:
+    matchExpressions:
+      - { key: app, operator: In, values: [frontend, api, cart, payment, ads] }
+  podMetricsEndpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+  podTargetLabels: [app]

@@ -188,6 +188,61 @@ Browser → frontend (proxies /api/*) → api → postgres / cart / payment / ad
 
 ---
 
+## Phase 4: Cloudflare Tunnel and DNS
+
+### Q: Do I need to register the `shop` subdomain? I already have a `www` on EC2.
+**Answer:** No. A subdomain isn't registered anywhere. AWS holds only the registration of `webfranzresume.click`, and every hostname under it is a DNS record in whichever DNS host is authoritative. Terraform creates one proxied CNAME for `shop`, and the existing `www` record is untouched.
+
+### Q: Why did Cloudflare say "invalid nameserver" when Route 53 looked correct?
+**Answer:** The registered domain listed **six** nameservers: Cloudflare's `audrey` and `dion` plus the four old `awsdns` ones. Cloudflare only activates a zone when the registrar lists exactly its assigned pair. Resolvers also picked from the mixed list, so `8.8.8.8` returned Cloudflare servers at one moment and AWS servers the next. `whois` exposed it, because it reads the registry and not a cache. Removing the four AWS entries fixed it.
+- Route 53 has two lists that look alike: the hosted zone's NS record (not read by the internet once you've moved) and the registered domain's name servers (the one that counts).
+- `original_name_servers` in Cloudflare's API only records where the domain started. It routes nothing.
+
+**Interview angle:** registrar vs DNS host vs origin are separate roles, and the registrar's nameserver list is authoritative. Details are in `DNS-CLOUDFLARE-AWS.md`.
+
+### Q: Why did `dig` time out against `1.1.1.1` and `8.8.8.8`?
+**Answer:** The corporate VPN blocked outbound DNS to anything but its own resolver. With the VPN off they worked. This was unrelated to the domain.
+
+### Q: I pasted my API token into the chat. What now?
+**Answer:** Treat it as exposed and roll or delete it, which was done. Tokens belong in an environment variable on the VM (`TF_VAR_cloudflare_api_token`), never in chat, files or git. Account and zone IDs are identifiers, not credentials, and are fine to commit.
+
+### Q: `git pull` failed because of `terraform/.terraform.lock.hcl`.
+**Answer:** The lock file is tracked, and both the VM's `terraform init` and the pull had changed it. It only records provider versions and checksums, so `git checkout` on that one file discards the VM's copy, and `terraform init` regenerates it. Commit the result so versions stay pinned.
+
+### Q: `expected DNS record to not already be present but already exists`.
+**Answer:** A `shop` CNAME already existed in Cloudflare. Importing it would have been wrong here: it pointed at tunnel `896f2ce1...`, while Terraform's state held tunnel `47f861eb...`. The likely cause is an earlier `apply` that created the record and then failed before saving state. I inferred that from the symptoms and never confirmed it. The fix was to compare the IDs, delete the stale record and re-apply.
+
+**Interview angle:** check what an existing resource points at before adopting it into state. Importing a record that targets the wrong tunnel would have aimed the site at nothing.
+
+### Q: What is `cfargotunnel.com`?
+**Answer:** Cloudflare's domain for tunnel endpoints, with addresses of the form `<tunnel-id>.cfargotunnel.com`. It is only usable as a **proxied** CNAME target inside a Cloudflare zone and isn't publicly resolvable. When the zone was pending, `dig` returned the raw `cfargotunnel.com` name instead of Cloudflare IPs, which was a sign the proxy wasn't active.
+
+### Q: Why is the tunnel healthy but `curl` says "Could not resolve host"?
+**Answer:** They are separate layers. The tunnel is `cloudflared` connecting outbound to Cloudflare, and it worked. Resolving the hostname depends on the zone being Active. Pending zones don't serve proxied records.
+
+### Q: My `www` runs on HTTP only. Will it survive the move?
+**Answer:** Once the zone is Active, an orange-cloud record routes through Cloudflare, which connects to the origin according to the SSL mode. Full or Full (strict) against an HTTP-only origin gives 52x errors, and Flexible with an origin that redirects to HTTPS gives a redirect loop. Options are grey cloud (nothing changes), Flexible (stopgap), or a certificate on the EC2 with Full (strict). See `WWW-FIX.md`. The outcome here was that `www` and `shop` both loaded after activation. I don't know which option you chose.
+
+---
+
+## Phase 5: Monitoring
+
+> Written and validated locally, but not yet recorded as deployed. Update this section once it runs.
+
+### Q: Why Prometheus and Grafana, and why trimmed?
+**Answer:** `kube-prometheus-stack` is the standard pairing for `prom-client` apps and is free. On 12 GB it is trimmed: Alertmanager off, the K3s-embedded control-plane targets off (they'd show permanently down), 3-day retention, and explicit memory limits. Roughly 1.5 GB total.
+
+### Q: Why are the PodMonitor, alerts and dashboard in Kustomize instead of Terraform?
+**Answer:** `PodMonitor` and `PrometheusRule` are custom resources whose definitions only exist after the Helm chart installs. Terraform's Kubernetes provider needs the schema at plan time, so declaring them in the same run can fail. `deploy.sh` applies them only if the CRDs exist.
+
+### Q: Why does `ServiceUnavailable` use kube-state-metrics instead of `up`?
+**Answer:** A deployment scaled to zero has no pod and no scrape target, so `up` vanishes instead of reporting 0, and an alert on `up == 0` would never fire. kube-state-metrics reports the deployment's available replicas directly.
+
+### Q: Why did the NetworkPolicies and port names change?
+**Answer:** The policies only allowed ingress from `web`, which would block Prometheus from `/metrics`, so `cart`, `payment` and `ads` now also allow `monitoring`. The PodMonitor refers to the container port by name, so each port is now `http`. That changes the pod spec and rolls the pods.
+
+---
+
 ## Design decisions to be ready to defend
 
 | Decision | Reasoning | Trade-off |

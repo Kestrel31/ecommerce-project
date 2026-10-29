@@ -1,0 +1,49 @@
+{
+  "title": "Shop Overview",
+  "uid": "shop-overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "15s",
+  "time": { "from": "now-30m", "to": "now" },
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "Available replicas per service",
+      "gridPos": { "h": 5, "w": 24, "x": 0, "y": 0 },
+      "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] } } },
+      "targets": [ { "refId": "A", "expr": "kube_deployment_status_replicas_available{namespace=~\"web|cart|payment|ads\"}", "legendFormat": "{{namespace}}/{{deployment}}" } ]
+    },
+    {
+      "id": 2, "type": "timeseries", "title": "API requests per second by status",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 },
+      "targets": [ { "refId": "A", "expr": "sum by (status) (rate(http_request_duration_seconds_count{app=\"api\"}[1m]))", "legendFormat": "{{status}}" } ]
+    },
+    {
+      "id": 3, "type": "timeseries", "title": "API latency p95 (seconds)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [ { "refId": "A", "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{app=\"api\"}[5m])))", "legendFormat": "p95" } ]
+    },
+    {
+      "id": 4, "type": "timeseries", "title": "Orders per 5 minutes by result",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 13 },
+      "targets": [ { "refId": "A", "expr": "sum by (result) (increase(orders_total[5m]))", "legendFormat": "{{result}}" } ]
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "Payment charges per 5 minutes by result",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 13 },
+      "targets": [ { "refId": "A", "expr": "sum by (result) (increase(payment_charges_total[5m]))", "legendFormat": "{{result}}" } ]
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "Memory by pod (working set)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 21 },
+      "fieldConfig": { "defaults": { "unit": "bytes" } },
+      "targets": [ { "refId": "A", "expr": "sum by (namespace, pod) (container_memory_working_set_bytes{namespace=~\"web|data|cart|payment|ads\",container!=\"\"})", "legendFormat": "{{namespace}}/{{pod}}" } ]
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "CPU by pod (cores)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 21 },
+      "targets": [ { "refId": "A", "expr": "sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{namespace=~\"web|data|cart|payment|ads\",container!=\"\"}[5m]))", "legendFormat": "{{namespace}}/{{pod}}" } ]
+    }
+  ]
+}

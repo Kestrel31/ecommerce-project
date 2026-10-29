@@ -24,7 +24,7 @@ spec:
       containers:
         - name: cart
           image: shop/cart:dev
-          ports: [{ containerPort: 3001 }]
+          ports: [{ name: http, containerPort: 3001 }]
           readinessProbe:
             httpGet: { path: /healthz, port: 3001 }
           livenessProbe:

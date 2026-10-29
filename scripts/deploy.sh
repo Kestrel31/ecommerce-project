@@ -21,6 +21,13 @@ docker save $(printf 'shop/%s:dev ' "${SERVICES[@]}") | sudo k3s ctr images impo
 echo "==> Applying manifests"
 $K apply -k k8s
 
+if $K get crd podmonitors.monitoring.coreos.com >/dev/null 2>&1; then
+  echo "==> Applying monitoring config (PodMonitor, alerts, dashboard)"
+  $K apply -k k8s/monitoring
+else
+  echo "==> Skipping monitoring config (Prometheus CRDs not installed; run terraform apply first)"
+fi
+
 echo "==> Restarting app deployments to pick up fresh images"
 for ns_dep in web/frontend web/api cart/cart payment/payment ads/ads; do
   $K -n "${ns_dep%/*}" rollout restart "deploy/${ns_dep#*/}"
