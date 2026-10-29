@@ -166,6 +166,26 @@ Browser → frontend (proxies /api/*) → api → postgres / cart / payment / ad
 
 **Interview angle:** adopting existing infrastructure into IaC, state as a source of truth, and the danger of replace actions on stateful resources.
 
+### Q: How does `terraform import` work?
+**Answer:** Terraform compares three things: your `.tf` code, the state file, and the real world. Phase 2 resources existed in the cluster but not in state, so a plain `apply` would fail with "already exists". `terraform import <address> <id>` looks up the real resource and records it in state under the address from your code. It changes nothing in the cluster and writes no `.tf` code, so the resource block must already exist.
+- **Address:** the resource in code, e.g. `kubernetes_namespace_v1.ns["web"]`.
+- **ID:** how the provider finds it: `web` for a namespace, `namespace/name` for a secret.
+- **`random_password` is special:** it isn't a real object, so the import ID is the value itself. Importing the existing password kept it matching the Postgres volume.
+
+**Interview angle:** adopting existing infrastructure into IaC without recreating it, and why the plan after an import is the safety check.
+
+### Q: How does `kubernetes_namespace_v1` get the real resource from K3s during import?
+**Answer:** Terraform core only manages state and the dependency graph. The `kubernetes` provider plugin (downloaded by `terraform init`) reads credentials from the kubeconfig (`config_path`, default `/etc/rancher/k3s/k3s.yaml`) and calls the K3s API: `GET /api/v1/namespaces/web`. It maps the JSON onto the resource schema and Terraform saves it to state. Import is read-only, and every `plan` repeats the lookup to detect drift.
+- The `KUBECONFIG` env var only affects `kubectl`, not the provider. I told you to export it before `terraform init`, which was unnecessary for Terraform.
+
+**Interview angle:** core vs provider architecture. The same pattern applies to the Cloudflare provider in Phase 4.
+
+### Q: What did `lifecycle { ignore_changes = all }` on `random_password.db` do, and why was it needed?
+**Answer:** I suspected the import stored only the password value, not settings such as `length` and `special`. Terraform would then see differences and plan to **replace** the password, producing a new one that no longer matches the Postgres volume and locking the API out. `ignore_changes = all` freezes the resource at its imported value. I did not see the plan, so that is my inference, not a confirmed diagnosis.
+- **Side effect:** a normal `apply` can no longer rotate the password. `-replace=random_password.db` still works but only updates the secrets, not the password inside Postgres.
+
+**Interview angle:** imported state can differ from what the code describes, and `plan` caught it before anything was applied. Never apply a plan that replaces a stateful resource without understanding why.
+
 ---
 
 ## Design decisions to be ready to defend

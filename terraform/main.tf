@@ -21,6 +21,10 @@ resource "kubernetes_namespace_v1" "ns" {
 resource "random_password" "db" {
   length  = 32
   special = false
+
+  # The existing Postgres volume already holds this password (imported from the
+  # Phase 2 cluster). Never let Terraform regenerate it.
+  lifecycle { ignore_changes = all }
 }
 
 resource "kubernetes_secret_v1" "db_credentials" {

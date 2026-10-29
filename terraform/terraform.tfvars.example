@@ -1,0 +1,5 @@
+# Copy to terraform.tfvars (gitignored). IDs are not secrets; the API token is,
+# so pass it as an env var instead: export TF_VAR_cloudflare_api_token='...'
+cloudflare_account_id = "52face9b902d01a20ce9caa514778cc2"
+cloudflare_zone_id    = "9ed3557a4bee73ed1cafbd099449ce81"
+hostname              = "shop.webfranzresume.click"
